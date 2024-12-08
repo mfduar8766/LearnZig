@@ -6,9 +6,9 @@ const os = std.os;
 const fs = std.fs;
 const eql = std.mem.eql;
 const assert = std.debug.assert;
-const Utils = @import("./utils.zig");
-const Types = @import("./types.zig");
 const Logger = @import("./logger.zig").Logger;
+const Utils = @import("./utils.zig");
+const io = std.io;
 
 // https://stackoverflow.com/questions/72122366/how-to-initialize-variadic-function-arguments-in-zig
 // https://www.reddit.com/r/Zig/comments/y5b2xw/anytype_vs_comptime_t/
@@ -20,55 +20,114 @@ const Logger = @import("./logger.zig").Logger;
 const CHROME_DRIVER_URL: []const u8 = "https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json";
 const SELENIUM_STAND_ALONE_JAR: []const u8 = "https://selenium-release.storage.googleapis.com/3.141/selenium-server-standalone-3.141.59.jar";
 
-const Place = struct { lat: f32, long: f32 };
+const Place = struct {
+    lat: f32,
+    long: f32,
+};
 
-fn createLoggerPayload(useData: bool) type {
-    if (useData) {
-        return struct {
-            time: []const u8 = "",
-            level: []const u8 = Types.LogLevels.get(0),
-            message: []const u8 = "",
-            data: []const u8 = "",
-        };
-    } else {
-        return struct {
-            time: []const u8 = "",
-            level: []const u8 = Types.LogLevels.get(0),
-            message: []const u8 = "",
-        };
+const Person = struct {
+    name: []const u8,
+    age: u8,
+    height: u8,
+    const Self = @This();
+
+    pub fn init(name: []const u8, age: u8, height: u8) Self {
+        return .{ .name = name, .age = age, .height = height };
     }
-}
+};
 
-const enable_j: bool = false;
+pub const Location = struct {
+    lat: f32,
+    lon: f32,
+
+    pub fn jsonStringify(self: Location, ws: anytype) !void {
+        try ws.beginObject();
+        try ws.objectField("lat");
+        try ws.write(self.lat);
+        try ws.objectField("lon");
+        try ws.write(self.lon);
+        try ws.endObject();
+    }
+};
+
+pub const Person2 = struct {
+    name: []const u8,
+    location: Location,
+
+    pub fn jsonStringify(self: Person2, ws: anytype) !void {
+        try ws.beginObject();
+        try ws.objectField("name");
+        try ws.write(self.name);
+        try ws.objectField("location");
+        try ws.write(self.location);
+        try ws.endObject();
+    }
+};
 
 pub fn main() !void {
-    const INFO: Types.LogLevels = @enumFromInt(0);
-    std.debug.print("ENUMFROMINT: {}\n", .{INFO});
-    const name: []const u8 = std.enums.tagName(Types.LogLevels, INFO) orelse "";
-    Print("ENUMS: {s}\n", .{name});
-    Print("ENUMS2: {s}, @TypeOf({any})\n", .{ Types.LogLevels.get(1), @TypeOf(Types.LogLevels.get(1)) });
-    const place: Place = .{ .lat = 22, .long = 44 };
-    Print("STRUCT: {any}\n", .{place});
-    var logger = try Logger.new("Logs/");
-    try logger.info("LOG1", null);
-    try logger.warn("LOG2", null);
-    try logger.err("LOG3", null);
-    try logger.fatal("LOG4", null);
+    // WRITES AN ARRAY TO THE FILE
+    // const person1 = Person.init("Alice", 25, 170);
+    // const person2 = Person.init("Bob", 30, 180);
+    // const person3 = Person.init("Charlie", 35, 190);
+    // const persons = &.{ person1, person2, person3 };
+    // const allocator = std.heap.page_allocator;
+    // const string = try std.json.stringifyAlloc(allocator, persons, .{ .emit_strings_as_arrays = false });
+    // var file = try fs.cwd().createFile("./persons.json", .{});
+    // defer file.close();
+    // _ = try file.writeAll(string);
 
-    const A = struct {
-        i: i8,
-        j: Utils.type_or_void(enable_j, []const u8),
-    };
-    const a = A{
-        .i = 5,
-        .j = Utils.value_or_void(enable_j, null),
-    };
-    var buf: [1024]u8 = undefined;
-    var fba = std.heap.FixedBufferAllocator.init(&buf);
-    const alloc = fba.allocator();
-    var str = try std.ArrayList(u8).initCapacity(alloc, buf.len);
-    defer str.deinit();
-    defer fba.reset();
-    try std.json.stringify(a, .{}, str.writer());
-    Print("{s}\n", .{str.items});
+    // const person = Person2{
+    //     .name = "Zig",
+    //     .location = Location{
+    //         .lat = 12.34,
+    //         .lon = 56.78,
+    //     },
+    // };
+    // var out = std.ArrayList(u8).init(std.heap.page_allocator);
+    // defer out.deinit();
+    // try std.json.stringify(person, .{ .whitespace = .indent_2 }, out.writer());
+    // std.debug.print("\n{s}\n", .{out.items});
+
+    // var buf: [1024]u8 = undefined;
+    // var fba = std.heap.FixedBufferAllocator.init(&buf);
+    // var string = std.ArrayList(u8).init(fba.allocator());
+    // try std.json.stringify(person, .{}, string.writer());
+
+    // const cwd = Utils.getCWD();
+    // var dirIter = try cwd.openDir("Logs", .{ .access_sub_paths = true, .iterate = true });
+    // const file = try dirIter.openFile("2024_12_7.log", .{ .mode = .read_write });
+    // defer dirIter.close();
+    // defer file.close();
+    // var bufWriter = io.bufferedWriter(file.writer());
+    // const writer = bufWriter.writer();
+    // _ = try writer.print("{s}\n", .{string.items});
+    // try bufWriter.flush();
+    // _ = try writer.print("{s}\n", .{string.items});
+    // try bufWriter.flush();
+
+    // var buf: [100]u8 = undefined;
+    // var fba = std.heap.FixedBufferAllocator.init(&buf);
+    // var string = std.ArrayList(u8).init(fba.allocator());
+    // try std.json.stringify(x, .{}, string.writer());
+    // Print("STR: {s}\n", .{string.items});
+
+    // const y = Place{
+    //     .lat = 51.22,
+    //     .long = -0.66,
+    // };
+    // var buf2: [100]u8 = undefined;
+    // var fba2 = std.heap.FixedBufferAllocator.init(&buf2);
+    // var string2 = std.ArrayList(u8).init(fba2.allocator());
+    // try std.json.stringify(y, .{}, string2.writer());
+    // Print("STR2: {s}\n", .{string2.items});
+
+    var logger = try Logger.init("Logs/");
+    defer {
+        logger.closeDirAndFiles();
+    }
+    // try logger.info("LOG1", null);
+    // try logger.info("LOG2", null);
+    // try logger.info("LOG3", null);
+    // try logger.info("LOG4", null);
+    // try logger.info("SOME DATA", string2.items);
 }
