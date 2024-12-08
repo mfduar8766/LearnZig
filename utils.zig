@@ -1,7 +1,7 @@
 const std = @import("std");
 const fs = std.fs;
 const os = std.os;
-const FileError = std.meta.Tuple(&.{(fs.SelfExePathError || fs.OpenSelfExeError || fs.GetAppDataDirError)});
+// const FileError = std.meta.Tuple(&.{(fs.SelfExePathError || fs.OpenSelfExeError || fs.GetAppDataDirError)});
 const io = std.io;
 
 pub const DateTime = struct {
@@ -98,7 +98,7 @@ const ErrorsEnum = enum(u2) {
 
         return ErrorSet.FileNotOpen;
     }
-}; //union(Tag) { e: fs.SelfExePathError };
+};
 
 pub const Result = struct {
     Ok: bool = false,
@@ -151,32 +151,6 @@ fn createErrorStruct(value: bool, err: ?anyerror) Result {
             std.debug.print("EXISTS: {any}\n", .{g});
         }
     }
-    // switch (ErrorTaggedUnion.e) {
-    //     .FileNotFound => std.debug.print("FNF: {any}\n", .{"NOT FOUND"}),
-    //     else => {
-    //         std.debug.print("ELSE: {}", .{});
-    //     },
-    // }
-
-    // if (err) |e| {
-    // const errorName: [:0]const u8 = @errorName(e);
-    // std.debug.print("RTRTRT: {s}\n", .{errorName});
-    // const c = @as(u16, errorName);
-    // std.debug.print("YUYU: {any}\n", .{c});
-    // switch (c) {
-    //     .FileNotFound => res.Err = e,
-    //     else => res.Err = error.NotSupported,
-    // }
-    // switch (e) {
-    //     .e.FileError => {
-    //         res.Err = error.FileNotFound;
-    //     },
-    //     else => {
-    //         res.Err = error.NotSupported;
-    //     },
-    // }
-    // }
-    // if (err) |e| res.Err = e;
     return res;
 }
 
@@ -191,18 +165,20 @@ pub fn createDir(dir: []const u8) Result {
 }
 
 pub fn createFile(dir: []const u8, fileName: []const u8) !void {
-    // var gpaAlloc = std.heap.GeneralPurposeAllocator(.{}){};
-    // defer _ = gpaAlloc.deinit();
-    // const allocator = gpaAlloc.allocator();
-    // const fullFilePath = try concatStrings(allocator, "/Logs/", fileName);
-    // defer allocator.free(fullFilePath);
     var dirIter = try getCWD().openDir(dir, .{ .access_sub_paths = true, .iterate = true });
     defer {
         dirIter.close();
     }
-    const file = try dirIter.createFile(fileName, .{ .truncate = false });
+    const file = try dirIter.createFile(fileName, .{});
     defer file.close();
-    // try cwd.makePath(fullFilePath);
+}
+
+pub fn createFile2(dir: []const u8, fileName: []const u8) !fs.File {
+    var dirIter = try getCWD().openDir(dir, .{ .access_sub_paths = true, .iterate = true });
+    defer {
+        dirIter.close();
+    }
+    return try dirIter.createFile(fileName, .{});
 }
 
 pub fn concatStrings(allocator: std.mem.Allocator, a: []const u8, b: []const u8) ![]u8 {
@@ -214,24 +190,4 @@ pub fn concatStrings(allocator: std.mem.Allocator, a: []const u8, b: []const u8)
 
 pub fn openDir(dir: []const u8) !fs.Dir {
     return try getCWD().makeOpenPath(dir, .{ .access_sub_paths = true, .iterate = true });
-}
-
-pub fn writeToFile(fileName: []const u8, bytes: []const u8) !void {
-    const cwd = getCWD();
-    var dirIter = try cwd.openDir("Logs", .{ .access_sub_paths = true, .iterate = true });
-    const file = try dirIter.openFile(fileName, fs.File.OpenFlags{ .mode = fs.File.OpenMode.read_write });
-    defer dirIter.close();
-    defer file.close();
-    // var gpaAlloc = std.heap.GeneralPurposeAllocator(.{}){};
-    // defer _ = gpaAlloc.deinit();
-    // const allocator = gpaAlloc.allocator();
-    // const fullFilePath = try concatStrings(allocator, "/Logs/", fileName);
-    // std.debug.print("OPEN: {s}\n", .{fileName});
-    // defer allocator.free(fullFilePath);
-    // const file = try getCWD().openFile(fileName, fs.File.OpenFlags{ .mode = fs.File.OpenMode.read_write });
-    var bufWriter = io.bufferedWriter(file.writer());
-    const writer = bufWriter.writer();
-    std.debug.print("DDDDDDDD: {s}\n", .{bytes});
-    _ = try writer.writeAll(bytes);
-    try bufWriter.flush();
 }
