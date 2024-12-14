@@ -53,12 +53,22 @@ pub const ErrorTypes = enum(u8) {
     // }
 };
 
-pub const Suit = enum {
-    clubs,
-    spades,
-    diamonds,
-    hearts,
-    pub fn isClubs(self: Suit) bool {
-        return self == Suit.clubs;
-    }
+pub const ChromeApiResponse = struct {
+    timestamp: []u8,
+    versions: []ChromeVersions,
+};
+
+const ChromeVersions = struct {
+    version: []u8,
+    revision: []u8,
+    downloads: ChromeDownloads,
+};
+
+const ChromeDownloads = struct {
+    chrome: []Chrome,
+};
+
+const Chrome = struct {
+    platform: []u8,
+    url: []u8,
 };

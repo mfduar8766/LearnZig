@@ -1,42 +1,41 @@
 const std = @import("std");
 const Print = std.debug.print;
-const expect = std.testing.expect;
 const time = std.time;
-const os = std.os;
 const fs = std.fs;
-const eql = std.mem.eql;
 const io = std.io;
-const assert = std.debug.assert;
 const Utils = @import("./utils.zig");
 const Types = @import("./types.zig");
 
 pub const Logger = struct {
+    const Self = @This();
     logDir: fs.Dir = undefined,
     logDirPath: []const u8 = "Logs",
     logData: LoggerData = undefined,
     logFile: fs.File = undefined,
-    filename: []const u8 = "",
-    const Self = @This();
+    fileName: []const u8 = "",
 
-    pub fn init(dir: []const u8) !Logger {
+    pub fn init(dir: []const u8) !Self {
         var logger = Logger{};
         if (dir.len > 0) logger.logDirPath = dir;
-        const value = Utils.fileOrDirExists(dir);
-        if (!value.Ok and value.Err.len > 0) {
-            Print("Logger::init()::dir does not exist. Creating dir:{s}\n", .{dir});
-            const res = Utils.createDir(dir);
-            if (res.Err.len > 0) {
+        var res = Utils.dirExists(dir);
+        if (!res.Ok) {
+            res = Utils.createDir(dir);
+            if (!res.Ok) {
                 @panic(res.Err);
-            } else {
-                Print("Logger::init()::dir:{s} created\n", .{dir});
-                try logger.createLogFile(dir);
             }
         } else {
-            try logger.createLogFile(dir);
+            // try logger.createLogFile(dir);
+            const today = Utils.fromTimestamp(@intCast(time.timestamp()));
+            const max_len = 14;
+            var buf: [max_len]u8 = undefined;
+            logger.fileName = std.fmt.bufPrint(&buf, "{}_{}_{}.log", .{ today.year, today.month, today.day }) catch |e| {
+                Print("Logger::init()::err:{any}\n", .{e});
+                @panic("Logger::init()::error creating fileB=Name...\n");
+            };
         }
         logger.logData = LoggerData.init();
         logger.logDir = try Utils.openDir(dir);
-        logger.logFile = try logger.logDir.openFile("2024_12_7.log", fs.File.OpenFlags{ .mode = fs.File.OpenMode.read_write });
+        logger.logFile = try logger.logDir.openFile(logger.fileName, fs.File.OpenFlags{ .mode = fs.File.OpenMode.read_write });
         return logger;
     }
     pub fn info(self: *Self, message: []const u8, data: ?[]const u8) !void {
@@ -56,12 +55,13 @@ pub const Logger = struct {
         self.logFile.close();
     }
     fn createLogFile(self: *Self, dir: []const u8) !void {
-        const today = Utils.fromTimestamp(@intCast(time.timestamp()));
-        const max_len = 13;
-        var buf: [max_len]u8 = undefined;
-        const fileName = try std.fmt.bufPrint(&buf, "{}_{}_{}.log", .{ today.year, today.month, today.day });
+        var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+        defer _ = gpa.deinit();
+        const allocator = gpa.allocator();
+        const fileName = try Utils.createFileName(allocator);
+        defer allocator.free(fileName);
         try Utils.createFile(dir, fileName);
-        self.filename = fileName;
+        self.fileName = fileName;
     }
 };
 

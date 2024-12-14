@@ -3,6 +3,7 @@ const fs = std.fs;
 const os = std.os;
 // const FileError = std.meta.Tuple(&.{(fs.SelfExePathError || fs.OpenSelfExeError || fs.GetAppDataDirError)});
 const io = std.io;
+const time = std.time;
 
 pub const DateTime = struct {
     year: u16,
@@ -81,25 +82,6 @@ fn paddingTwoDigits(buf: *[2]u8, value: u8) void {
     }
 }
 
-const ErrorsEnum = enum(u2) {
-    FILE_ERROR = 0,
-    pub fn getError(key: u2, err: anyerror) anyerror {
-        const errorName: [:0]const u8 = @errorName(err);
-        const fromInt: ErrorsEnum = @enumFromInt(key);
-        std.debug.print("ERR-NAME: {s}\n", .{errorName});
-        std.debug.print("FROM-INT: {any}\n", .{fromInt});
-        const name: []const u8 = std.enums.tagName(ErrorsEnum, fromInt) orelse "";
-        std.debug.print("NAME: {s}\n", .{name});
-
-        const ErrorSet = error{
-            FileNotOpen,
-        };
-        std.debug.print("GFFG: {any}, @typeOf({})\n", .{ ErrorSet.FileNotOpen, @TypeOf(ErrorSet) });
-
-        return ErrorSet.FileNotOpen;
-    }
-};
-
 pub const Result = struct {
     Ok: bool = false,
     Err: [:0]const u8 = "",
@@ -125,31 +107,48 @@ pub fn getCWD() fs.Dir {
     return fs.cwd();
 }
 
-pub fn fileOrDirExists(path: []const u8) Result {
-    const stat = getCWD().statFile(path) catch |err| {
-        std.debug.print("Utils::FileOrDirExists()::error: {}\n", .{err});
-        return createErrorStruct(false, err);
+pub fn dirExists(dirPath: []const u8) Result {
+    getCWD().makePath(dirPath) catch |e| {
+        std.debug.print("Utils::FileOrDirExists()::error: {}\n", .{e});
+        return createErrorStruct(false, e);
     };
-    return switch (stat.kind) {
-        .directory => createErrorStruct(true, null),
-        .file => createErrorStruct(true, null),
-        else => {
-            std.debug.print("{s}\n", .{@tagName(stat.kind)});
-            return createErrorStruct(true, error.NotSupported);
-        },
-    };
+    return Result{ .Err = "", .Ok = true };
+}
+
+pub fn fileExistsInDir(dir: fs.Dir, fileName: []const u8) !bool {
+    var itter = dir.iterate();
+    var exists = false;
+    while (itter.next()) |entry| {
+        if (entry) |e| {
+            std.debug.print("NAME: {s} FNAME:{s}\n", .{ e.name, fileName });
+            if (e.kind == fs.File.Kind.file and std.mem.eql(u8, e.name, fileName)) {
+                exists = true;
+                break;
+            }
+            if (e.kind == fs.File.Kind.directory) {
+                const subDir = try dir.openDir(e.name, .{ .access_sub_paths = true, .iterate = true });
+                exists = try fileExistsInDir(subDir, fileName);
+            }
+        } else {
+            @panic("Utils::fileExistsInDir()::entry does not exist");
+        }
+    } else |err| {
+        std.debug.print("Utils::fileExistsInDir()::err:{}\n", .{err});
+    }
+    return exists;
+}
+
+pub fn createFileName(allocator: std.mem.Allocator) ![]u8 {
+    const today = fromTimestamp(@intCast(time.timestamp()));
+    const strAlloc = std.fmt.allocPrint(allocator, "{}_{}_{}.log", .{ today.year, today.month, today.day });
+    return strAlloc;
 }
 
 fn createErrorStruct(value: bool, err: ?anyerror) Result {
     var res: Result = .{ .Ok = value };
     if (err) |e| {
         res.Err = @errorName(e);
-        std.debug.print("YYYYYYYYYYYYY: {s}\n", .{@errorName(e)});
-        const g = ErrorsEnum.getError(0, e);
-        std.debug.print("HHHH: {any}, typeOf({})\n", .{ g, @TypeOf(g) });
-        if (g == error.FileNotOpen) {
-            std.debug.print("EXISTS: {any}\n", .{g});
-        }
+        std.debug.print("Utils::createErrorStruct()::{s}\n", .{@errorName(e)});
     }
     return res;
 }
@@ -165,12 +164,13 @@ pub fn createDir(dir: []const u8) Result {
 }
 
 pub fn createFile(dir: []const u8, fileName: []const u8) !void {
+    std.debug.print("CREATE-FILE: {s}, {s}\n", .{ dir, fileName });
     var dirIter = try getCWD().openDir(dir, .{ .access_sub_paths = true, .iterate = true });
+    const file = try dirIter.createFile(fileName, .{});
     defer {
         dirIter.close();
+        file.close();
     }
-    const file = try dirIter.createFile(fileName, .{});
-    defer file.close();
 }
 
 pub fn createFile2(dir: []const u8, fileName: []const u8) !fs.File {
