@@ -120,7 +120,6 @@ pub fn fileExistsInDir(dir: fs.Dir, fileName: []const u8) !bool {
     var exists = false;
     while (itter.next()) |entry| {
         if (entry) |e| {
-            std.debug.print("NAME: {s} FNAME:{s}\n", .{ e.name, fileName });
             if (e.kind == fs.File.Kind.file and std.mem.eql(u8, e.name, fileName)) {
                 exists = true;
                 break;
@@ -164,7 +163,6 @@ pub fn createDir(dir: []const u8) Result {
 }
 
 pub fn createFile(dir: []const u8, fileName: []const u8) !void {
-    std.debug.print("CREATE-FILE: {s}, {s}\n", .{ dir, fileName });
     var dirIter = try getCWD().openDir(dir, .{ .access_sub_paths = true, .iterate = true });
     const file = try dirIter.createFile(fileName, .{});
     defer {

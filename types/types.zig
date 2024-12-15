@@ -1,5 +1,5 @@
 const std = @import("std");
-const Utils = @import("./utils.zig");
+const Utils = @import("../utils/utils.zig");
 
 pub const LogLevels = enum(u2) {
     INFO = 0,
@@ -84,13 +84,13 @@ pub const ErrorTypes = enum(u8) {
     // }
 };
 
-pub const PlatForms = enum(u2) {
+pub const PlatForms = enum(u4) {
     LINUX,
     MAC_ARM_64,
     MAC_X64,
     WIN_32,
     WIN_64,
-    pub fn getOS(key: u2) []const u8 {
+    pub fn getOS(key: u4) []const u8 {
         return switch (key) {
             0 => "linux64",
             1 => "mac-arm64",

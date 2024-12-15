@@ -3,7 +3,7 @@ const http = std.http;
 const Client = std.http.Client;
 const Uri = std.Uri;
 const RequestOptions = std.http.Client.RequestOptions;
-const Types = @import("/types.zig");
+const Types = @import("../types//types.zig");
 
 pub const Http = struct {
     const Self = @This();
@@ -29,6 +29,7 @@ pub const Http = struct {
         self.client.deinit();
     }
     pub fn get(self: *Self, url: []const u8, options: RequestOptions, maxReaderSize: ?usize) ![]u8 {
+        std.debug.print("Http::get()::making request to {s}\n", .{url});
         const uri = try Uri.parse(url);
         var req = try self.client.open(.GET, uri, options);
         defer req.deinit();
@@ -45,8 +46,9 @@ pub const Http = struct {
         if (maxReaderSize) |max| {
             maxSize = max;
         }
+        std.debug.print("MAX: {d}, BODY-KEN: {any}\n", .{ maxSize, req.response.content_length });
         const body = try req.reader().readAllAlloc(self.allocator, maxSize);
-        defer self.allocator.free(body);
+        // defer self.allocator.free(body);
         std.debug.print("BODY.LEN:{d} READER.LEM:{d}\n", .{ body.len, self.reqOpts.maxReaderSize });
         return body;
     }

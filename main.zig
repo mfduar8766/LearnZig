@@ -1,11 +1,13 @@
 const std = @import("std");
 const Print = std.debug.print;
-const Logger = @import("./logger.zig").Logger;
-const Utils = @import("./utils.zig");
-const Http = @import("./http.zig").Http;
+const Logger = @import("./logger/logger.zig").Logger;
+const Utils = @import("./utils/utils.zig");
+const Http = @import("./http//http.zig").Http;
 const fs = std.fs;
 const process = std.process;
-const Types = @import("./types.zig");
+const Types = @import("./types/types.zig");
+const builtIn = @import("builtin");
+const eql = std.mem.eql;
 
 // https://www.google.com/search?q=automate+chromedriver+without+selenium&sca_esv=86a88d896bcf14c1&rlz=1C5CHFA_enUS772US772&ei=CfNdZ4bfE6fiwN4P9rCLuA4&ved=0ahUKEwjGh8TtlKiKAxUnMdAFHXbYAucQ4dUDCBA&uact=5&oq=automate+chromedriver+without+selenium&gs_lp=Egxnd3Mtd2l6LXNlcnAiJmF1dG9tYXRlIGNocm9tZWRyaXZlciB3aXRob3V0IHNlbGVuaXVtMgYQABgWGB4yBhAAGBYYHjILEAAYgAQYhgMYigUyCxAAGIAEGIYDGIoFMgsQABiABBiGAxiKBTIIEAAYgAQYogQyBRAAGO8FMggQABiABBiiBEi6cFD0DljSbnAIeACQAQCYAXSgAb0cqgEENDAuNLgBA8gBAPgBAZgCL6ACkhqoAhTCAgoQABiwAxjWBBhHwgILEAAYgAQYkQIYigXCAgoQABiABBhDGIoFwgINEAAYgAQYsQMYQxiKBcICDhAuGIAEGLEDGNEDGMcBwgILEC4YgAQYsQMYgwHCAggQABiABBixA8ICERAuGIAEGLEDGNEDGIMBGMcBwgIFEAAYgATCAgsQABiABBixAxiDAcICDhAAGIAEGLEDGIMBGIoFwgIaEC4YgAQYsQMYgwEYlwUY3AQY3gQY4ATYAQHCAggQLhiABBixA8ICDhAuGIAEGLEDGMcBGK8BwgILEC4YgAQY0QMYxwHCAg0QABiABBixAxhGGPkBwgInEAAYgAQYsQMYRhj5ARiXBRiMBRjdBBhGGPkBGPQDGPUDGPYD2AEBwgIUEAAYgAQYkQIYtAIYigUY6gLYAQLCAh0QABiABBi0AhjUAxjlAhi3AxiKBRjqAhiKA9gBAsICEBAAGAMYtAIY6gIYjwHYAQHCAgoQLhiABBhDGIoFwgIFEC4YgATCAhAQLhiABBjRAxhDGMcBGIoFwgIOEC4YgAQYxwEYjgUYrwHCAgsQLhiABBjHARivAcICERAuGIAEGJECGNEDGMcBGIoFwgIHEAAYgAQYDcICBhAAGA0YHsICCBAAGBYYChgewgIIEAAYogQYiQWYAwXxBZASH6MFj0bWiAYBkAYIugYGCAEQARgUugYECAIYB5IHBDQzLjSgB5LzAg&sclient=gws-wiz-serp#fpstate=ive&vld=cid:a3860590,vid:F2jMzBW1Vl4,st:0
 // https://stackoverflow.com/questions/72122366/how-to-initialize-variadic-function-arguments-in-zig
@@ -20,7 +22,6 @@ const Types = @import("./types.zig");
 // STABLE BETA ECT https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json
 
 pub fn main() !void {
-    // const host: []const u8 = "http://localhost:4444/sesion";
     const CHROME_DRIVER_URL: []const u8 = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json";
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -29,7 +30,31 @@ pub fn main() !void {
     defer allocator.free(serverHeaderBuf);
     var req = Http.init(allocator, .{ .maxReaderSize = 8696 });
     defer req.deinit();
-    _ = try req.get(CHROME_DRIVER_URL, .{ .server_header_buffer = serverHeaderBuf }, undefined);
+    const body = try req.get(CHROME_DRIVER_URL, .{ .server_header_buffer = serverHeaderBuf }, undefined);
+    defer allocator.free(body);
+    Print("OS: {s}\n", .{builtIn.target.os.tag.archName(builtIn.cpu.arch)});
+    const res = try std.json.parseFromSlice(Types.ChromeDriverResponse, allocator, body, .{ .ignore_unknown_fields = true });
+    defer res.deinit();
+    var chromeDriverURL: []const u8 = "";
+    for (res.value.channels.Stable.downloads.chromedriver) |driver| {
+        if (eql(u8, driver.platform, Types.PlatForms.getOS(0))) {
+            chromeDriverURL = driver.url;
+            break;
+        }
+    }
+    const serverHeaderBuf2: []u8 = try allocator.alloc(u8, 1024 * 8);
+    defer allocator.free(serverHeaderBuf2);
+    var req2 = Http.init(allocator, .{ .maxReaderSize = 8696 });
+    defer req2.deinit();
+    const body2 = try req.get(chromeDriverURL, .{ .server_header_buffer = serverHeaderBuf2 }, 11 * 1024 * 1024);
+    defer allocator.free(body2);
+
+    // const fileBuf: [body2.len]u8 = undefined;
+    // const fileArray = std.ArrayList(u8).initCapacity(allocator, body2.len);
+    // const cwd = Utils.getCWD();
+
+    // Print("DOWNLOAD: {s}\n", .{body2});
+
     // const res = try std.json.parseFromSlice(Types.ChromeDriverResponse, allocator, body, .{ .ignore_unknown_fields = true });
     // defer res.deinit();
     // const drivers = res.value.channels.Stable.downloads.chromedriver;
