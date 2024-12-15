@@ -173,14 +173,6 @@ pub fn createFile(dir: []const u8, fileName: []const u8) !void {
     }
 }
 
-pub fn createFile2(dir: []const u8, fileName: []const u8) !fs.File {
-    var dirIter = try getCWD().openDir(dir, .{ .access_sub_paths = true, .iterate = true });
-    defer {
-        dirIter.close();
-    }
-    return try dirIter.createFile(fileName, .{});
-}
-
 pub fn concatStrings(allocator: std.mem.Allocator, a: []const u8, b: []const u8) ![]u8 {
     var bytes = try allocator.alloc(u8, a.len + b.len);
     std.mem.copyForwards(u8, bytes, a);
