@@ -3,8 +3,8 @@ const Print = std.debug.print;
 const time = std.time;
 const fs = std.fs;
 const io = std.io;
-const Utils = @import("./utils.zig");
-const Types = @import("./types.zig");
+const Utils = @import("../utils/utils.zig");
+const Types = @import("../types/types.zig");
 
 pub const Logger = struct {
     const Self = @This();
