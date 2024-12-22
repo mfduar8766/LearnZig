@@ -1,5 +1,6 @@
 /Logs/*
 .DS_Store
-/chrome-*/*
+/chrome**
 /test/*
 /learningMaterial/*
+*.txt

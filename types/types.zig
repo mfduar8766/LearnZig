@@ -30,7 +30,7 @@ pub const RequestUrlPaths = enum(u8) {
     pub fn getUrlPath(allocator: std.mem.Allocator, key: u8, url: []const u8, sessionID: []const u8) []const u8 {
         return switch (key) {
             0 => try Utils.concatStrings(allocator, url, sessionID),
-            1 => "ttp://localhost:4444/",
+            1 => "http://localhost:4444/",
             2 => "",
             3 => "",
             4 => "",
@@ -97,6 +97,39 @@ pub const PlatForms = enum(u4) {
             2 => "mac-x64",
             3 => "win32",
             4 => "win64",
+            else => "UNKNOWN",
+        };
+    }
+};
+
+pub const ChromeDriverFileName = enum(u8) {
+    LINUX,
+    MAC_ARM_64,
+    MAC_X64,
+    WIN_32,
+    WIN_64,
+    pub fn getFileName(key: u4) []const u8 {
+        return switch (key) {
+            0 => "chrome-linux64.zip",
+            1 => "chrome-mac-arm64.zip",
+            2 => "chrome-mac-x64.zip",
+            3 => "chrome-win32.zip",
+            4 => "chrome-win64.zip",
+            else => "UNKNOWN",
+        };
+    }
+};
+
+// ChromeDriverVersion - version of driver to download Stable, Beta, Dev
+pub const ChromeDriverVersion = enum(u4) {
+    STABLE,
+    BETA,
+    DEV,
+    pub fn getDriverVersion(key: u4) []const u8 {
+        return switch (key) {
+            0 => "Stable",
+            1 => "Beta",
+            2 => "Dev",
             else => "UNKNOWN",
         };
     }
