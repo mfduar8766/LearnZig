@@ -107,12 +107,16 @@ pub fn getCWD() fs.Dir {
     return fs.cwd();
 }
 
-pub fn dirExists(dirPath: []const u8) Result {
+pub fn makeDirPath(dirPath: []const u8) Result {
     getCWD().makePath(dirPath) catch |e| {
         std.debug.print("Utils::FileOrDirExists()::error: {}\n", .{e});
         return createErrorStruct(false, e);
     };
     return Result{ .Err = "", .Ok = true };
+}
+
+pub fn dirExists(dir: []const u8) fs.Dir.AccessError!void {
+    return getCWD().access(dir, .{});
 }
 
 pub fn fileExistsInDir(dir: fs.Dir, fileName: []const u8) !bool {

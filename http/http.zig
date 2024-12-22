@@ -14,8 +14,6 @@ pub const Http = struct {
     allocator: Allocator,
     client: std.http.Client,
     reqOpts: ReqOptions,
-    host: []const u8 = "http://localhost:4444/session",
-    sessionID: []const u8 = "",
 
     pub fn init(allocator: std.mem.Allocator, reqOpts: ReqOptions) Self {
         const client = Client{ .allocator = allocator };
@@ -38,7 +36,7 @@ pub const Http = struct {
         try req.finish();
         try req.wait();
 
-        std.debug.print("REQ.STATUS: {d} LEN: {any}\n", .{ req.response.status, req.response.content_length });
+        std.debug.print("Http::get()::statusCode:{d}, bodyLen:{?d}\n", .{ req.response.status, req.response.content_length });
         if (req.response.status != http.Status.ok) {
             return http.Client.RequestError.NetworkUnreachable;
         }
@@ -46,31 +44,23 @@ pub const Http = struct {
         if (maxReaderSize) |max| {
             maxSize = max;
         }
-        std.debug.print("MAX: {d}, BODY-KEN: {any}\n", .{ maxSize, req.response.content_length });
         const body = try req.reader().readAllAlloc(self.allocator, maxSize);
         // defer self.allocator.free(body);
-        std.debug.print("BODY.LEN:{d} READER.LEM:{d}\n", .{ body.len, self.reqOpts.maxReaderSize });
         return body;
     }
     pub fn post(self: *Self, url: []const u8, options: RequestOptions) ![]u8 {
         const uri = try Uri.parse(url);
         var req = try self.client.open(.POST, uri, options);
         defer req.deinit();
-
         try req.send();
         try req.finish();
         try req.wait();
-
         std.debug.print("REQ.POST.STATUS: {d} LEN: {any}\n", .{ req.response.status, req.response.content_length });
         if (req.response.status != http.Status.ok) {
             return http.Client.RequestError.NetworkUnreachable;
         }
         const body = try req.reader().readAllAlloc(self.allocator, self.reqOpts.maxReaderSize);
         defer self.allocator.free(body);
-        std.debug.print("Len:{d}\n", .{body.len});
         return body;
-    }
-    fn setRequestUrlSuffix(self: *Self, key: u8) ![]const u8 {
-        return try Types.RequestUrlPaths.getUrlPath(self.allocator, key, self.host, self.sessionID);
     }
 };

@@ -8,46 +8,55 @@ const process = std.process;
 const Types = @import("./types/types.zig");
 const builtIn = @import("builtin");
 const eql = std.mem.eql;
+const Context = @import("./context/context.zig");
+const Driver = @import("./driver//driver.zig").Driver;
 
-// https://www.google.com/search?q=automate+chromedriver+without+selenium&sca_esv=86a88d896bcf14c1&rlz=1C5CHFA_enUS772US772&ei=CfNdZ4bfE6fiwN4P9rCLuA4&ved=0ahUKEwjGh8TtlKiKAxUnMdAFHXbYAucQ4dUDCBA&uact=5&oq=automate+chromedriver+without+selenium&gs_lp=Egxnd3Mtd2l6LXNlcnAiJmF1dG9tYXRlIGNocm9tZWRyaXZlciB3aXRob3V0IHNlbGVuaXVtMgYQABgWGB4yBhAAGBYYHjILEAAYgAQYhgMYigUyCxAAGIAEGIYDGIoFMgsQABiABBiGAxiKBTIIEAAYgAQYogQyBRAAGO8FMggQABiABBiiBEi6cFD0DljSbnAIeACQAQCYAXSgAb0cqgEENDAuNLgBA8gBAPgBAZgCL6ACkhqoAhTCAgoQABiwAxjWBBhHwgILEAAYgAQYkQIYigXCAgoQABiABBhDGIoFwgINEAAYgAQYsQMYQxiKBcICDhAuGIAEGLEDGNEDGMcBwgILEC4YgAQYsQMYgwHCAggQABiABBixA8ICERAuGIAEGLEDGNEDGIMBGMcBwgIFEAAYgATCAgsQABiABBixAxiDAcICDhAAGIAEGLEDGIMBGIoFwgIaEC4YgAQYsQMYgwEYlwUY3AQY3gQY4ATYAQHCAggQLhiABBixA8ICDhAuGIAEGLEDGMcBGK8BwgILEC4YgAQY0QMYxwHCAg0QABiABBixAxhGGPkBwgInEAAYgAQYsQMYRhj5ARiXBRiMBRjdBBhGGPkBGPQDGPUDGPYD2AEBwgIUEAAYgAQYkQIYtAIYigUY6gLYAQLCAh0QABiABBi0AhjUAxjlAhi3AxiKBRjqAhiKA9gBAsICEBAAGAMYtAIY6gIYjwHYAQHCAgoQLhiABBhDGIoFwgIFEC4YgATCAhAQLhiABBjRAxhDGMcBGIoFwgIOEC4YgAQYxwEYjgUYrwHCAgsQLhiABBjHARivAcICERAuGIAEGJECGNEDGMcBGIoFwgIHEAAYgAQYDcICBhAAGA0YHsICCBAAGBYYChgewgIIEAAYogQYiQWYAwXxBZASH6MFj0bWiAYBkAYIugYGCAEQARgUugYECAIYB5IHBDQzLjSgB5LzAg&sclient=gws-wiz-serp#fpstate=ive&vld=cid:a3860590,vid:F2jMzBW1Vl4,st:0
 // https://stackoverflow.com/questions/72122366/how-to-initialize-variadic-function-arguments-in-zig
 // https://www.reddit.com/r/Zig/comments/y5b2xw/anytype_vs_comptime_t/
 // https://ziggit.dev/t/format-timestamp-into-iso-8601-strings/3824
 // https://www.reddit.com/r/Zig/comments/l0ne7b/is_there_a_way_of_adding_an_optional_fields_in/
 // https://ziggit.dev/t/how-to-set-struct-field-with-runtime-values/2758/6
 // https://www.aolium.com/karlseguin/cf03dee6-90e1-85ac-8442-cf9e6c11602a
-// https://cookbook.ziglang.cc/08-02-external.html
+// https://cookbook.ziglang.cc/08-02-external.html STD.IO
 // BETTER CHROME URL STABLE VERSIONS https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json
 // https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json
 // STABLE BETA ECT https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json
+// CHROME-DRIVER-YOUTUBE: https://www.youtube.com/watch?v=F2jMzBW1Vl4&ab_channel=RakibulYeasin
+// https://joeymckenzie.tech/blog/ziggin-around-with-linked-lists
+// https://w3c.github.io/webdriver/#endpoints
 
 pub fn main() !void {
-    const CHROME_DRIVER_URL: []const u8 = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json";
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
     const allocator = gpa.allocator();
-    const serverHeaderBuf: []u8 = try allocator.alloc(u8, 1024 * 8);
-    defer allocator.free(serverHeaderBuf);
-    var req = Http.init(allocator, .{ .maxReaderSize = 8696 });
-    defer req.deinit();
-    const body = try req.get(CHROME_DRIVER_URL, .{ .server_header_buffer = serverHeaderBuf }, undefined);
-    defer allocator.free(body);
-    Print("OS: {s}\n", .{builtIn.target.os.tag.archName(builtIn.cpu.arch)});
-    const res = try std.json.parseFromSlice(Types.ChromeDriverResponse, allocator, body, .{ .ignore_unknown_fields = true });
-    defer res.deinit();
-    var chromeDriverURL: []const u8 = "";
-    for (res.value.channels.Stable.downloads.chromedriver) |driver| {
-        if (eql(u8, driver.platform, Types.PlatForms.getOS(0))) {
-            chromeDriverURL = driver.url;
-            break;
-        }
+    // var ctx = Context.Context2(i32).init(allocator);
+    // defer ctx.deInit();
+    // try ctx.withValue("FOO", 33);
+    // var ctx = Context.Context.init(allocator);
+    // defer ctx.deInit();
+    // const withValue = try ctx.withValue("FOO", "BAR");
+    // Print("VALUE: {any}\n", .{ctx.getValue("FOO").?});
+
+    var logger = try Logger.init("Logs");
+    try logger.info("main program running...", null);
+    var driver = try Driver.init(allocator, logger, .{});
+    try driver.launchWindow("https://jsonplaceholder.typicode.com/");
+    defer {
+        _ = gpa.deinit();
+        logger.closeDirAndFiles();
     }
-    const serverHeaderBuf2: []u8 = try allocator.alloc(u8, 1024 * 8);
-    defer allocator.free(serverHeaderBuf2);
-    var req2 = Http.init(allocator, .{ .maxReaderSize = 8696 });
-    defer req2.deinit();
-    const body2 = try req.get(chromeDriverURL, .{ .server_header_buffer = serverHeaderBuf2 }, 11 * 1024 * 1024);
-    defer allocator.free(body2);
+
+    // var buf: [9945236]u8 = undefined;
+    // var fba = std.heap.FixedBufferAllocator.init(&buf);
+    // var arrList = try std.ArrayList(u8).initCapacity(fba.allocator(), buf.len);
+    // for (body2) |value| {
+    //     try arrList.append(value);
+    // }
+    // var cwd = Utils.getCWD();
+    // var dir = try cwd.makeOpenPath("chromeDriver", .{ .access_sub_paths = true, .iterate = true });
+    // defer dir.close();
+    // for (arrList.items) |value| {
+    //     try dir.writeFile(.{ .data = value, .sub_path = "/", .flags = .{} });
+    // }
 
     // const fileBuf: [body2.len]u8 = undefined;
     // const fileArray = std.ArrayList(u8).initCapacity(allocator, body2.len);
