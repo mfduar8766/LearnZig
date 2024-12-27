@@ -6,35 +6,33 @@ const Types = @import("../types/types.zig");
 const eql = std.mem.eql;
 const startsWith = std.mem.startsWith;
 const Utils = @import("../utils/utils.zig");
-const endsWith = std.mem.endsWith;
+const DriverTypes = @import("./types.zig");
+const process = std.process;
 
 pub const Driver = struct {
     const Self = @This();
     const Allocator = std.mem.Allocator;
-    const Options = struct {
-        chromeDriverPath: ?[]const u8 = null,
-        chromeDriverPort: ?i32 = null,
-        chromeDriverVersion: ?[]const u8 = null,
-    };
     const CHROME_DRIVER_DOWNLOAD_URL: []const u8 = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json";
     chromeDriverRestURL: []const u8 = "http://localhost:{}/session",
     chromeDriverPort: i32 = 4444,
     allocator: Allocator,
     logger: Logger,
     chromeDriverVersion: []const u8 = Types.ChromeDriverVersion.getDriverVersion(0),
-    chromeDriverPath: []const u8 = "",
+    chromeDriverExecPath: []const u8 = "",
     sessionID: []const u8 = "",
 
-    pub fn init(allocator: Allocator, logger: Logger, options: ?Options) !Self {
+    pub fn init(allocator: Allocator, logger: Logger, options: ?DriverTypes.Options) !Self {
         var driver = Driver{ .allocator = allocator, .logger = logger };
         try driver.checkOptions(options);
-        try driver.downloadChromeDriverVersionInformation();
+        if (driver.chromeDriverExecPath.len == 0) {
+            try driver.downloadChromeDriverVersionInformation();
+        }
         return driver;
     }
     pub fn launchWindow(self: *Self, url: []const u8) !void {
         try self.logger.info("Driver::launchWindow()::navigating to:", url);
     }
-    fn checkOptions(self: *Self, options: ?Options) !void {
+    fn checkOptions(self: *Self, options: ?DriverTypes.Options) !void {
         if (options) |op| {
             if (op.chromeDriverPort) |port| {
                 self.chromeDriverPort = port;
@@ -50,8 +48,8 @@ pub const Driver = struct {
                     self.chromeDriverVersion = op.chromeDriverVersion.?;
                 }
             }
-            if (op.chromeDriverPath) |path| {
-                if (path.len > 0) self.chromeDriverPath = path;
+            if (op.chromeDriverExecPath) |path| {
+                if (path.len > 0) self.chromeDriverExecPath = path;
             }
         }
     }
@@ -73,7 +71,7 @@ pub const Driver = struct {
     }
     fn downoadChromeDriverZip(self: *Self, res: Types.ChromeDriverResponse) !void {
         var chromeDriverURL: []const u8 = "";
-        const tag: []const u8 = getOsType();
+        const tag = getOsType();
         if (tag.len == 0 or eql(u8, tag, "UNKNOWN")) {
             try self.logger.fatal("Driver::downoadChromeDriverZip()::cannot find OSType", tag);
             @panic("Driver::downoadChromeDriverZip()::osType does not exist exiting program...");
@@ -91,6 +89,9 @@ pub const Driver = struct {
             try arrayList.append(value);
         }
         const chromeDriverFileName = arrayList.items[arrayList.items.len - 1];
+        if (chromeDriverFileName.len == 0 or eql(u8, chromeDriverFileName, "UNKNOWN")) {
+            @panic("Driver::downoadChromeDriverZip()::wrong osType exiting program...");
+        }
         const serverHeaderBuf: []u8 = try self.allocator.alloc(u8, 1024 * 8);
         defer self.allocator.free(serverHeaderBuf);
         var req = Http.init(self.allocator, .{ .maxReaderSize = 10679494 });
@@ -104,6 +105,30 @@ pub const Driver = struct {
         defer file.close();
         try file.writeAll(body);
         try file.seekTo(0);
+        Utils.fileExists("chromeDriver") catch |e| {
+            self.logger.err("Driver::downoadChromeDriverZip()::chromeDriver folder does not exist creating folder", e);
+            try unZipChromeDriver(chromeDriverFileName);
+        };
+    }
+    fn unZipChromeDriver(fileName: []const u8) !void {
+        const cwd = Utils.getCWD();
+        const file = try cwd.openFile(fileName, .{});
+        defer file.close();
+        try cwd.makeDir("chromeDriver");
+        var dir = try cwd.openDir("chromeDriver", .{ .iterate = true });
+        defer dir.close();
+        var seek = file.seekableStream();
+        var zipItter = try std.zip.Iterator(@TypeOf(seek)).init(seek);
+        while (true) {
+            const next = try zipItter.next();
+            if (next) |entry| {
+                if (entry.uncompressed_size == 0) continue;
+                const totalOffSet = entry.filename_len + @sizeOf(std.zip.LocalFileHeader);
+                try seek.seekTo(@intCast(totalOffSet));
+                var buf: [1024]u8 = undefined;
+                _ = try entry.extract(seek, .{}, &buf, dir);
+            } else break;
+        }
     }
     fn getOsType() []const u8 {
         return switch (builtIn.os.tag) {
@@ -119,5 +144,40 @@ pub const Driver = struct {
     }
     fn setRequestUrlSuffix(self: *Self, key: u8) ![]const u8 {
         return try Types.RequestUrlPaths.getUrlPath(self.allocator, key, self.host, self.sessionID);
+    }
+    fn openDriver(self: *Self) !void {
+        const argv = [_][]const u8{
+            "chmod",
+            "+x",
+            "./startChrome.sh",
+        };
+        var child = process.Child.init(&argv, self.allocator);
+        child.stdout_behavior = .Pipe;
+        child.stderr_behavior = .Pipe;
+        var stdout = std.ArrayList(u8).init(self.allocator);
+        var stderr = std.ArrayList(u8).init(self.allocator);
+        defer {
+            stdout.deinit();
+            stderr.deinit();
+        }
+        try child.spawn();
+        try child.collectOutput(&stdout, &stderr, 1024);
+        const term = try child.wait();
+        switch (term) {
+            .Exited => |code| {
+                if (code != 0) {
+                    std.debug.print("Driver::openDriver()::The following command exited with error code: {any}\n", .{code});
+                    return error.CommandFailed;
+                }
+            },
+            .Signal => |sig| {
+                std.debug.print("The following command returned signal: {any}\n", .{sig});
+            },
+            else => {
+                std.debug.print("The following command terminated unexpectedly with error:{s}\n", .{stderr.items});
+                return error.CommandFailed;
+            },
+        }
+        std.debug.print("Out: {s}\n", .{stdout.items});
     }
 };
