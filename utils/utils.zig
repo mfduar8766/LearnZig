@@ -1,9 +1,11 @@
 const std = @import("std");
 const fs = std.fs;
 const os = std.os;
-// const FileError = std.meta.Tuple(&.{(fs.SelfExePathError || fs.OpenSelfExeError || fs.GetAppDataDirError)});
 const io = std.io;
 const time = std.time;
+const DriverOptions = @import("../driver//types.zig").Options;
+const Allocator = std.mem.Allocator;
+const Types = @import("../types/types.zig");
 
 pub const DateTime = struct {
     year: u16,
@@ -184,4 +186,37 @@ pub fn concatStrings(allocator: std.mem.Allocator, a: []const u8, b: []const u8)
 
 pub fn openDir(dir: []const u8) !fs.Dir {
     return try getCWD().makeOpenPath(dir, .{ .access_sub_paths = true, .iterate = true });
+}
+
+pub fn readCmdArgs(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !std.json.Parsed(DriverOptions) {
+    var optionsFile: []const u8 = "";
+    while (args.next()) |a| {
+        var splitArgs = std.mem.splitAny(u8, a, "=");
+        while (splitArgs.next()) |next| {
+            if (std.mem.endsWith(u8, next, ".json")) {
+                optionsFile = next;
+                break;
+            }
+        }
+    }
+    if (optionsFile.len == 0) {
+        @panic("Utils::readCmdArgs()::no options.json file passed in, exiting program...");
+    }
+    const cwd = getCWD();
+    var buf: [2000]u8 = undefined;
+    const content = try cwd.readFile(optionsFile, &buf);
+    if (content.len == 0) {
+        @panic("Utils::readCmdArgs()::options.json file is empty, exiting program...");
+    }
+    const options = try std.json.parseFromSlice(DriverOptions, allocator, content, .{ .ignore_unknown_fields = true });
+    return options;
+}
+
+pub fn fileExists(fileName: []const u8) std.fs.Dir.StatFileError!std.fs.Dir.Stat {
+    var cwd = getCWD();
+    return try cwd.statFile(fileName);
+}
+
+pub fn parseJSON(comptime T: type, allocator: Allocator, body: []const u8, options: std.json.ParseOptions) !std.json.Parsed(T) {
+    return try std.json.parseFromSlice(T, allocator, body, options);
 }

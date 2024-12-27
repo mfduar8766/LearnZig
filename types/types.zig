@@ -44,46 +44,6 @@ pub const RequestUrlPaths = enum(u8) {
     }
 };
 
-pub const ErrorTypes = enum(u8) {
-    FileNotFound,
-    AccessDenied,
-    NameTooLong,
-    NotSupported,
-    NotDir,
-    SymLinkLoop,
-    InputOutput,
-    FileTooBig,
-    IsDir,
-    ProcessFdQuotaExceeded,
-    SystemFdQuotaExceeded,
-    NoDevice,
-    SystemResources,
-    NoSpaceLeft,
-    FileSystem,
-    BadPathName,
-    DeviceBusy,
-    SharingViolation,
-    PipeBusy,
-    NotLink,
-    PathAlreadyExists,
-    pub fn getErrorName(key: u8) [:0]const u8 {
-        return switch (key) {
-            0 => @errorName(error.FileNotFound),
-            1 => "WARNING",
-            2 => "ERROR",
-            3 => "FATAL",
-        };
-    }
-    // pub fn get(name: [:0]const u8) bool {
-    //     var gpaAlloc = std.heap.GeneralPurposeAllocator(.{}){};
-    //     defer _ = gpaAlloc.deinit();
-    //     const allocator = gpaAlloc.allocator();
-    //     var set = std.AutoHashMap(usize, void).init(allocator);
-    //     defer set.deinit();
-    //     try set.put(error.FileNotFound, true);
-    // }
-};
-
 pub const PlatForms = enum(u4) {
     LINUX,
     MAC_ARM_64,
@@ -110,11 +70,11 @@ pub const ChromeDriverFileName = enum(u8) {
     WIN_64,
     pub fn getFileName(key: u4) []const u8 {
         return switch (key) {
-            0 => "chrome-linux64.zip",
-            1 => "chrome-mac-arm64.zip",
-            2 => "chrome-mac-x64.zip",
-            3 => "chrome-win32.zip",
-            4 => "chrome-win64.zip",
+            0 => "chromedriver-linux64.zip",
+            1 => "chromedriver-mac-arm64.zip",
+            2 => "chromedriver-mac-x64.zip",
+            3 => "chromedriver-win32.zip",
+            4 => "chromedriver-win64.zip",
             else => "UNKNOWN",
         };
     }
@@ -204,23 +164,3 @@ const ChromeHeadlessShell = struct {
     platform: []u8,
     url: []u8,
 };
-
-// pub const ChromeApiResponse = struct {
-//     timestamp: []u8,
-//     versions: []ChromeVersions,
-// };
-
-// const ChromeVersions = struct {
-//     version: []u8,
-//     revision: []u8,
-//     downloads: ChromeDownloads,
-// };
-
-// const ChromeDownloads = struct {
-//     chrome: []Chrome,
-// };
-
-// const Chrome = struct {
-//     platform: []u8,
-//     url: []u8,
-// };
