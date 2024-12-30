@@ -4,6 +4,7 @@ const Logger = @import("./logger/logger.zig").Logger;
 const Utils = @import("./utils/utils.zig");
 const process = std.process;
 const Driver = @import("./driver//driver.zig").Driver;
+const DriverOptions = @import("./driver//types.zig").Options;
 
 // https://stackoverflow.com/questions/72122366/how-to-initialize-variadic-function-arguments-in-zig
 // https://www.reddit.com/r/Zig/comments/y5b2xw/anytype_vs_comptime_t/
@@ -22,15 +23,74 @@ const Driver = @import("./driver//driver.zig").Driver;
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    var args = process.args();
-    const driverOptions = try Utils.readCmdArgs(allocator, &args);
     var logger = try Logger.init("Logs");
     try logger.info("Main::main()::program running...", null);
-    var driver = try Driver.init(allocator, logger, driverOptions.value);
-    driverOptions.deinit();
+
+    // var cwd = Utils.getCWD();
+    // const buf: [1024]u8 = undefined;
+    // var arrayList = try std.ArrayList(u8).initCapacity(allocator, buf.len);
+    // const fileName = "startChromeDriver.sh";
+    // var fileExists = true;
+    // Utils.fileExists(cwd, fileName) catch |e| {
+    //     try logger.warn("Driver::openDriver()::error:", @errorName(e));
+    //     fileExists = false;
+    // };
+    // if (fileExists) {
+    //     try cwd.deleteFile(fileName);
+    // }
+    // var startChromeDriver = try cwd.createFile(fileName, .{});
+    // try startChromeDriver.chmod(777);
+    // _ = try arrayList.writer().write("#!/bin/bash\n");
+    // _ = try arrayList.writer().write("cd \"chromeDriver/chromedriver-mac-x64/\"\n");
+    // _ = try arrayList.writer().write("chmod +x ./chromedriver\n");
+    // _ = try arrayList.writer().write("./chromedriver --port=42069 --log-path=/Users/matheusduarte/Desktop/LearnZig/Logs/2024_12_30.log\n");
+    // var bufWriter = std.io.bufferedWriter(startChromeDriver.writer());
+    // const writer = bufWriter.writer();
+    // _ = try writer.print("{s}\n", .{arrayList.items});
+    // try bufWriter.flush();
+
+    // const argv = [_][]const u8{
+    //     "chmod",
+    //     "+x",
+    //     "./startChromeDriver.sh",
+    // };
+    // try Utils.executeCmds(3, allocator, &argv);
+    // const arg2 = [_][]const u8{
+    //     "./startChromeDriver.sh",
+    // };
+    // try Utils.executeCmds(1, allocator, &arg2);
+
+    var driver = try Driver.init(allocator, logger, DriverOptions{ .chromeDriverExecPath = "/Users/matheusduarte/Desktop/LearnZig/chromeDriver/chromedriver-mac-x64/chromedriver", .chromeDriverPort = 42069, .chromeDriverVersion = "Stable" });
     try driver.launchWindow("https://jsonplaceholder.typicode.com/");
     defer {
-        _ = gpa.deinit();
+        driver.deInit();
+        // startChromeDriver.close();
+        // arrayList.deinit();
         logger.closeDirAndFiles();
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) @panic("Main::main()::leaking memory exiting program...");
     }
 }
+// var args = process.args();
+// const options = try Utils.readCmdArgs(allocator, &args);
+// print("GG: {s}\n", .{options.value.chromeDriverExecPath.?});
+// var optionsFile: []const u8 = "";
+// while (args.next()) |a| {
+//     var splitArgs = std.mem.splitAny(u8, a, "=");
+//     while (splitArgs.next()) |next| {
+//         if (std.mem.endsWith(u8, next, ".json")) {
+//             optionsFile = next;
+//             break;
+//         }
+//     }
+// }
+// if (optionsFile.len == 0) {
+//     @panic("Utils::readCmdArgs()::no options.json file passed in, exiting program...");
+// }
+// const cwd = Utils.getCWD();
+// var buf: [2000]u8 = undefined;
+// const content = try cwd.readFile(optionsFile, &buf);
+// if (content.len == 0) {
+//     @panic("Utils::readCmdArgs()::options.json file is empty, exiting program...");
+// }
+// const options = try std.json.parseFromSlice(DriverOptions, allocator, content, .{ .ignore_unknown_fields = true });
