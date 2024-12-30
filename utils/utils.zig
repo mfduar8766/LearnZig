@@ -6,6 +6,10 @@ const time = std.time;
 const DriverOptions = @import("../driver//types.zig").Options;
 const Allocator = std.mem.Allocator;
 const Types = @import("../types/types.zig");
+const eql = std.mem.eql;
+const eqlAny = std.meta.eql;
+const process = std.process;
+const print = std.debug.print;
 
 pub const DateTime = struct {
     year: u16,
@@ -117,10 +121,6 @@ pub fn makeDirPath(dirPath: []const u8) Result {
     return Result{ .Err = "", .Ok = true };
 }
 
-pub fn dirExists(dir: []const u8) fs.Dir.AccessError!void {
-    return getCWD().access(dir, .{});
-}
-
 pub fn fileExistsInDir(dir: fs.Dir, fileName: []const u8) !bool {
     var itter = dir.iterate();
     var exists = false;
@@ -208,15 +208,117 @@ pub fn readCmdArgs(allocator: std.mem.Allocator, args: *std.process.ArgIterator)
     if (content.len == 0) {
         @panic("Utils::readCmdArgs()::options.json file is empty, exiting program...");
     }
-    const options = try std.json.parseFromSlice(DriverOptions, allocator, content, .{ .ignore_unknown_fields = true });
-    return options;
+    return try std.json.parseFromSlice(DriverOptions, allocator, content, .{ .ignore_unknown_fields = true });
 }
 
-pub fn fileExists(fileName: []const u8) std.fs.Dir.StatFileError!std.fs.Dir.Stat {
-    var cwd = getCWD();
-    return try cwd.statFile(fileName);
+pub fn fileExists(cwd: std.fs.Dir, fileName: []const u8) std.fs.Dir.AccessError!void {
+    return try cwd.access(fileName, .{});
 }
 
 pub fn parseJSON(comptime T: type, allocator: Allocator, body: []const u8, options: std.json.ParseOptions) !std.json.Parsed(T) {
     return try std.json.parseFromSlice(T, allocator, body, options);
 }
+
+pub fn dirExists(dir: []const u8) (std.fs.Dir.MakeError || std.fs.Dir.StatFileError)!void {
+    const cwd = getCWD();
+    return try cwd.makePath(dir);
+}
+
+pub fn indexOf(comptime T: type, slice: T, comptime T2: type, value: T2) isize {
+    var index: isize = -1;
+    for (slice, 0..) |el, i| {
+        const element = @as(@Type(@typeInfo(T2)), el);
+        if (eql(u8, element, value)) {
+            index = @as(isize, @intCast(i));
+            break;
+        }
+    }
+    return index;
+}
+
+pub fn executeCmds(argsLen: comptime_int, allocator: std.mem.Allocator, args: *const [argsLen][]const u8) !void {
+    var child = process.Child.init(args, allocator);
+    child.stdout_behavior = .Pipe;
+    child.stderr_behavior = .Pipe;
+    var stdout = std.ArrayList(u8).init(allocator);
+    var stderr = std.ArrayList(u8).init(allocator);
+    defer {
+        stdout.deinit();
+        stderr.deinit();
+    }
+    try child.spawn();
+    try child.collectOutput(&stdout, &stderr, 1024);
+    const term = try child.wait();
+    switch (term) {
+        .Exited => |code| {
+            if (code != 0) {
+                std.debug.print("Utils::executeCmds()::The following command exited with error code: {any}\n", .{code});
+                return error.CommandFailed;
+            }
+        },
+        .Signal => |sig| {
+            std.debug.print("Utils::executeCmds()::The following command returned signal: {any}\n", .{sig});
+        },
+        else => {
+            std.debug.print("Utils::executeCmds()::The following command terminated unexpectedly with error:{s}\n", .{stderr.items});
+            return error.CommandFailed;
+        },
+    }
+    print("Utils::executeCmds*()::command output: {s}\n", .{stdout.items});
+}
+
+pub fn binarySearch() !void {
+    // var index: i32 = -1;
+    // var left: usize = 0;
+    // var right: usize = slice.len - 1;
+    // std.debug.print("RIGHT: {d}\n", .{right});
+    // while (left <= right) {
+    //     var mid = left + (right - left) / 2;
+    //     const arrMid = slice[mid];
+    //     std.debug.print("LEFT: {d}, RIGHT: {d}, mid: {d}, INDEX: {d}, ARR: {s}\n", .{ left, right, mid, index, arrMid });
+    //     // if (!eql(u8, arrMid, value)) {
+    //     //     continue;
+    //     // } else {
+    //     //     index = @as(i32, @intCast(mid));
+    //     // }
+
+    //     if (@as(i32, @intCast(mid)) == index) {
+    //         std.debug.print("MATCH\n", .{});
+    //         return mid;
+    //     } else if (@as(i32, @intCast(mid)) < index) {
+    //         mid = mid + 1;
+    //         left = mid;
+    //         index += 1; //= @as(i32, @intCast(left));
+    //         std.debug.print("L-IDX: {d}\n", .{index});
+    //     } else if (@as(i32, @intCast(mid)) > index) {
+    //         mid = mid - 1;
+    //         right = mid;
+    //         index += 1; //= @as(i32, @intCast(right));
+    //         std.debug.print("R-IDX: {d}\n", .{index});
+    //     }
+    // }
+    // return 0;
+}
+
+// pub fn indexOf(comptime T: type, arr: T, comptime T2: type, target: anytype) i32 {
+//     var index: i32 = -1;
+//     var left: usize = 0;
+//     const arrType = @as(@Type(@typeInfo(T)), arr);
+//     const targetTypeRef = @as(@Type(@typeInfo(T2)), target);
+//     var right: usize = arr.len - 1;
+//     while (left <= right) {
+//         index += 1;
+//         var mid = left + (right - left) / 2;
+//         const arrMid = @as(@Type(@typeInfo(T2)), arrType[mid]);
+//         if (eql(@Type(@typeInfo(T2)), arrMid, targetTypeRef)) {
+//             return @as(i32, mid);
+//         } else if (mid < index) {
+//             mid = mid + 1;
+//             left = mid;
+//         } else {
+//             mid = mid - 1;
+//             right = mid;
+//         }
+//     }
+//     return -1;
+// }

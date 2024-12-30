@@ -1,8 +1,8 @@
 pub const Options = struct {
-    chromeDriverExecPath: ?[]const u8 = null,
-    chromeDriverPort: ?i32 = null,
-    chromeDriverVersion: ?[]const u8 = null,
-    args: [][]const u8 = &.{},
+    chromeDriverExecPath: ?[]const u8 = undefined,
+    chromeDriverPort: ?i32 = undefined,
+    chromeDriverVersion: ?[]const u8 = undefined,
+    args: ?[][]const u8 = undefined,
 };
 
 pub const ChromeDriverSessionResponse = struct {
