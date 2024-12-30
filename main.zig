@@ -60,10 +60,10 @@ pub fn main() !void {
     // };
     // try Utils.executeCmds(1, allocator, &arg2);
 
-    var driver = try Driver.init(allocator, logger, DriverOptions{ .chromeDriverExecPath = "/Users/matheusduarte/Desktop/LearnZig/chromeDriver/chromedriver-mac-x64/chromedriver", .chromeDriverPort = 4444, .chromeDriverVersion = "Stable" });
+    var driver = try Driver.init(allocator, logger, DriverOptions{ .chromeDriverExecPath = "/Users/matheusduarte/Desktop/LearnZig/chromeDriver/chromedriver-mac-x64/chromedriver", .chromeDriverPort = 42069, .chromeDriverVersion = "Stable" });
     try driver.launchWindow("https://jsonplaceholder.typicode.com/");
-    // options.deinit();
     defer {
+        driver.deInit();
         // startChromeDriver.close();
         // arrayList.deinit();
         logger.closeDirAndFiles();

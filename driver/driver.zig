@@ -34,10 +34,8 @@ pub const Driver = struct {
         }
         return driver;
     }
-    pub fn deInit(self: *Self) !void {
-        if (self.logger) |log| {
-            log.closeDirAndFiles();
-        }
+    pub fn deInit(self: *Self) void {
+        self.logger.closeDirAndFiles();
     }
     pub fn newChromeDriverSession(_: *Self) !void {}
     pub fn launchWindow(self: *Self, url: []const u8) !void {
@@ -171,6 +169,9 @@ pub const Driver = struct {
         const allocator = arena.allocator();
         const fileName = "startChromeDriver.sh";
         const cwd = Utils.getCWD();
+        const CWD_PATH = try cwd.realpathAlloc(allocator, ".");
+        const chromeDriverLogFilePath = try Utils.concatStrings(allocator, CWD_PATH, "/Logs/driver.log"); // fix NOT HARD CODED
+
         var fileExists = true;
         Utils.fileExists(cwd, fileName) catch |e| {
             try self.logger.warn("Driver::openDriver()::error:", @errorName(e));
@@ -183,7 +184,6 @@ pub const Driver = struct {
         var arrayList = try std.ArrayList(u8).initCapacity(allocator, 1024);
         var startChromeDriver = try cwd.createFile(fileName, .{});
         try startChromeDriver.chmod(777);
-
         var chromeDriverPathArray = std.ArrayList([]const u8).init(allocator);
         var splitChromePath = std.mem.split(u8, self.chromeDriverExecPath, "/");
         while (splitChromePath.next()) |next| {
@@ -195,14 +195,16 @@ pub const Driver = struct {
         }
 
         const chromeDriverExec = chromeDriverPathArray.pop();
-        const n = chromeDriverPathArray.items[@as(usize, @intCast(index))..];
-        const joinedPath = try std.mem.join(self.allocator, "/", n);
+        const chromeDriverExecFolderIndex = chromeDriverPathArray.items[@as(usize, @intCast(index))..];
+        const joinedPath = try std.mem.join(allocator, "/", chromeDriverExecFolderIndex);
 
-        const max_len = 50;
-        var formattedBuf: [max_len]u8 = undefined;
+        var formattedBuf: [100]u8 = undefined;
+        var formattedBuf2: [100]u8 = undefined;
+        var formattedBuf3: [1024]u8 = undefined;
+
         const formattedDriverFolderPath = try std.fmt.bufPrint(&formattedBuf, "cd \"{s}/\"\n", .{joinedPath});
-        const formattedChmodX = try std.fmt.bufPrint(&formattedBuf, "chmod +x ./{s}\n", .{chromeDriverExec});
-        const formattedPort = try std.fmt.bufPrint(&formattedBuf, "./{s} --port={d}\n", .{ chromeDriverExec, self.chromeDriverPort });
+        const formattedChmodX = try std.fmt.bufPrint(&formattedBuf2, "chmod +x ./{s}\n", .{chromeDriverExec});
+        const formattedPort = try std.fmt.bufPrint(&formattedBuf3, "./{s} --port={d} --log-path={s}\n", .{ chromeDriverExec, self.chromeDriverPort, chromeDriverLogFilePath });
 
         _ = try arrayList.writer().write("#!/bin/bash\n");
         _ = try arrayList.writer().write(formattedDriverFolderPath);
@@ -213,20 +215,21 @@ pub const Driver = struct {
         _ = try writer.print("{s}\n", .{arrayList.items});
         try bufWriter.flush();
 
-        const argv = [_][]const u8{
-            "chmod",
-            "+x",
-            "./startChromeDriver.sh",
-        };
-        try Utils.executeCmds(3, allocator, &argv);
-        const arg2 = [_][]const u8{
-            "./startChromeDriver.sh",
-        };
-        try Utils.executeCmds(1, allocator, &arg2);
-
-        // try driverDir.deleteFile(fileName);
+        // const argv = [_][]const u8{
+        //     "chmod",
+        //     "+x",
+        //     "./startChromeDriver.sh",
+        // };
+        // try Utils.executeCmds(3, allocator, &argv);
+        // const arg2 = [_][]const u8{
+        //     "./startChromeDriver.sh",
+        // };
+        // try Utils.executeCmds(1, allocator, &arg2);
+        // try cwd.deleteFile("startChromeDriver.sh");
         defer {
-            self.allocator.free(joinedPath);
+            allocator.free(CWD_PATH);
+            allocator.free(chromeDriverLogFilePath);
+            allocator.free(joinedPath);
             chromeDriverPathArray.deinit();
             startChromeDriver.close();
             arrayList.deinit();

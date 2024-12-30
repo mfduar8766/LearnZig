@@ -267,37 +267,22 @@ pub fn executeCmds(argsLen: comptime_int, allocator: std.mem.Allocator, args: *c
     print("Utils::executeCmds*()::command output: {s}\n", .{stdout.items});
 }
 
-pub fn binarySearch() !void {
-    // var index: i32 = -1;
-    // var left: usize = 0;
-    // var right: usize = slice.len - 1;
-    // std.debug.print("RIGHT: {d}\n", .{right});
-    // while (left <= right) {
-    //     var mid = left + (right - left) / 2;
-    //     const arrMid = slice[mid];
-    //     std.debug.print("LEFT: {d}, RIGHT: {d}, mid: {d}, INDEX: {d}, ARR: {s}\n", .{ left, right, mid, index, arrMid });
-    //     // if (!eql(u8, arrMid, value)) {
-    //     //     continue;
-    //     // } else {
-    //     //     index = @as(i32, @intCast(mid));
-    //     // }
-
-    //     if (@as(i32, @intCast(mid)) == index) {
-    //         std.debug.print("MATCH\n", .{});
-    //         return mid;
-    //     } else if (@as(i32, @intCast(mid)) < index) {
-    //         mid = mid + 1;
-    //         left = mid;
-    //         index += 1; //= @as(i32, @intCast(left));
-    //         std.debug.print("L-IDX: {d}\n", .{index});
-    //     } else if (@as(i32, @intCast(mid)) > index) {
-    //         mid = mid - 1;
-    //         right = mid;
-    //         index += 1; //= @as(i32, @intCast(right));
-    //         std.debug.print("R-IDX: {d}\n", .{index});
-    //     }
-    // }
-    // return 0;
+pub fn binarySearch(comptime T: type, slice: T, element: anytype) i32 {
+    var left: usize = 0;
+    var right: usize = slice.len - 1;
+    while (left <= right) {
+        var mid = left + (right - left) / 2;
+        if (slice[mid] == element) {
+            return @as(i32, @intCast(mid));
+        } else if (slice[mid] < element) {
+            mid = mid + 1;
+            left = mid;
+        } else {
+            mid = mid - 1;
+            right = mid;
+        }
+    }
+    return -1;
 }
 
 // pub fn indexOf(comptime T: type, arr: T, comptime T2: type, target: anytype) i32 {
