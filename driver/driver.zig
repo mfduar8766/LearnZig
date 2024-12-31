@@ -113,7 +113,6 @@ pub const Driver = struct {
         try file.writeAll(body);
         try file.seekTo(0);
         Utils.dirExists("chromeDriver") catch |e| {
-            std.debug.print("ERR: {}\n", .{e});
             try self.logger.err("Driver::downoadChromeDriverZip()::chromeDriver folder does not exist creating folder", @errorName(e));
             try unZipChromeDriver(chromeDriverFileName);
         };

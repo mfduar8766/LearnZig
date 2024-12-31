@@ -34,26 +34,3 @@ pub fn main() !void {
         if (deinit_status == .leak) @panic("Main::main()::leaking memory exiting program...");
     }
 }
-// var args = process.args();
-// const options = try Utils.readCmdArgs(allocator, &args);
-// print("GG: {s}\n", .{options.value.chromeDriverExecPath.?});
-// var optionsFile: []const u8 = "";
-// while (args.next()) |a| {
-//     var splitArgs = std.mem.splitAny(u8, a, "=");
-//     while (splitArgs.next()) |next| {
-//         if (std.mem.endsWith(u8, next, ".json")) {
-//             optionsFile = next;
-//             break;
-//         }
-//     }
-// }
-// if (optionsFile.len == 0) {
-//     @panic("Utils::readCmdArgs()::no options.json file passed in, exiting program...");
-// }
-// const cwd = Utils.getCWD();
-// var buf: [2000]u8 = undefined;
-// const content = try cwd.readFile(optionsFile, &buf);
-// if (content.len == 0) {
-//     @panic("Utils::readCmdArgs()::options.json file is empty, exiting program...");
-// }
-// const options = try std.json.parseFromSlice(DriverOptions, allocator, content, .{ .ignore_unknown_fields = true });
