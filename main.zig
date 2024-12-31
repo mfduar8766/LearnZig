@@ -26,46 +26,9 @@ pub fn main() !void {
     var logger = try Logger.init("Logs");
     try logger.info("Main::main()::program running...", null);
 
-    // var cwd = Utils.getCWD();
-    // const buf: [1024]u8 = undefined;
-    // var arrayList = try std.ArrayList(u8).initCapacity(allocator, buf.len);
-    // const fileName = "startChromeDriver.sh";
-    // var fileExists = true;
-    // Utils.fileExists(cwd, fileName) catch |e| {
-    //     try logger.warn("Driver::openDriver()::error:", @errorName(e));
-    //     fileExists = false;
-    // };
-    // if (fileExists) {
-    //     try cwd.deleteFile(fileName);
-    // }
-    // var startChromeDriver = try cwd.createFile(fileName, .{});
-    // try startChromeDriver.chmod(777);
-    // _ = try arrayList.writer().write("#!/bin/bash\n");
-    // _ = try arrayList.writer().write("cd \"chromeDriver/chromedriver-mac-x64/\"\n");
-    // _ = try arrayList.writer().write("chmod +x ./chromedriver\n");
-    // _ = try arrayList.writer().write("./chromedriver --port=42069 --log-path=/Users/matheusduarte/Desktop/LearnZig/Logs/2024_12_30.log\n");
-    // var bufWriter = std.io.bufferedWriter(startChromeDriver.writer());
-    // const writer = bufWriter.writer();
-    // _ = try writer.print("{s}\n", .{arrayList.items});
-    // try bufWriter.flush();
-
-    // const argv = [_][]const u8{
-    //     "chmod",
-    //     "+x",
-    //     "./startChromeDriver.sh",
-    // };
-    // try Utils.executeCmds(3, allocator, &argv);
-    // const arg2 = [_][]const u8{
-    //     "./startChromeDriver.sh",
-    // };
-    // try Utils.executeCmds(1, allocator, &arg2);
-
     var driver = try Driver.init(allocator, logger, DriverOptions{ .chromeDriverExecPath = "/Users/matheusduarte/Desktop/LearnZig/chromeDriver/chromedriver-mac-x64/chromedriver", .chromeDriverPort = 42069, .chromeDriverVersion = "Stable" });
     try driver.launchWindow("https://jsonplaceholder.typicode.com/");
     defer {
-        driver.deInit();
-        // startChromeDriver.close();
-        // arrayList.deinit();
         logger.closeDirAndFiles();
         const deinit_status = gpa.deinit();
         if (deinit_status == .leak) @panic("Main::main()::leaking memory exiting program...");

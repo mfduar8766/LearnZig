@@ -13,7 +13,7 @@ pub const Driver = struct {
     const Self = @This();
     const Allocator = std.mem.Allocator;
     const CHROME_DRIVER_DOWNLOAD_URL: []const u8 = "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json";
-    chromeDriverRestURL: []const u8 = "http://localhost:{}/session",
+    chromeDriverRestURL: []const u8 = "http://127.0.0.1:{s}/session",
     chromeDriverPort: i32 = 4444,
     allocator: Allocator,
     logger: Logger = undefined,
@@ -33,9 +33,6 @@ pub const Driver = struct {
             try driver.downloadChromeDriverVersionInformation();
         }
         return driver;
-    }
-    pub fn deInit(self: *Self) void {
-        self.logger.closeDirAndFiles();
     }
     pub fn newChromeDriverSession(_: *Self) !void {}
     pub fn launchWindow(self: *Self, url: []const u8) !void {
@@ -170,7 +167,10 @@ pub const Driver = struct {
         const fileName = "startChromeDriver.sh";
         const cwd = Utils.getCWD();
         const CWD_PATH = try cwd.realpathAlloc(allocator, ".");
-        const chromeDriverLogFilePath = try Utils.concatStrings(allocator, CWD_PATH, "/Logs/driver.log"); // fix NOT HARD CODED
+        const logDir = self.logger.logDirPath;
+        var logDirPathBuf: [50]u8 = undefined;
+        const formattedLogDirPath = try std.fmt.bufPrint(&logDirPathBuf, "/{s}/driver.log", .{logDir});
+        const chromeDriverLogFilePath = try Utils.concatStrings(allocator, CWD_PATH, formattedLogDirPath);
 
         var fileExists = true;
         Utils.fileExists(cwd, fileName) catch |e| {
@@ -198,13 +198,9 @@ pub const Driver = struct {
         const chromeDriverExecFolderIndex = chromeDriverPathArray.items[@as(usize, @intCast(index))..];
         const joinedPath = try std.mem.join(allocator, "/", chromeDriverExecFolderIndex);
 
-        var formattedBuf: [100]u8 = undefined;
-        var formattedBuf2: [100]u8 = undefined;
-        var formattedBuf3: [1024]u8 = undefined;
-
-        const formattedDriverFolderPath = try std.fmt.bufPrint(&formattedBuf, "cd \"{s}/\"\n", .{joinedPath});
-        const formattedChmodX = try std.fmt.bufPrint(&formattedBuf2, "chmod +x ./{s}\n", .{chromeDriverExec});
-        const formattedPort = try std.fmt.bufPrint(&formattedBuf3, "./{s} --port={d} --log-path={s}\n", .{ chromeDriverExec, self.chromeDriverPort, chromeDriverLogFilePath });
+        const formattedDriverFolderPath = try Utils.formatString(100, []const u8, "cd \"{s}/\"\n", .{joinedPath});
+        const formattedChmodX = try Utils.formatString(100, []const u8, "chmod +x ./{s}\n", .{chromeDriverExec});
+        const formattedPort = try Utils.formatString(1024, []const u8, "./{s} --port={d} --log-path={s}\n", .{ chromeDriverExec, self.chromeDriverPort, chromeDriverLogFilePath });
 
         _ = try arrayList.writer().write("#!/bin/bash\n");
         _ = try arrayList.writer().write(formattedDriverFolderPath);
@@ -215,16 +211,16 @@ pub const Driver = struct {
         _ = try writer.print("{s}\n", .{arrayList.items});
         try bufWriter.flush();
 
-        // const argv = [_][]const u8{
-        //     "chmod",
-        //     "+x",
-        //     "./startChromeDriver.sh",
-        // };
-        // try Utils.executeCmds(3, allocator, &argv);
-        // const arg2 = [_][]const u8{
-        //     "./startChromeDriver.sh",
-        // };
-        // try Utils.executeCmds(1, allocator, &arg2);
+        const argv = [_][]const u8{
+            "chmod",
+            "+x",
+            "./startChromeDriver.sh",
+        };
+        try Utils.executeCmds(3, allocator, &argv);
+        const arg2 = [_][]const u8{
+            "./startChromeDriver.sh",
+        };
+        try Utils.executeCmds(1, allocator, &arg2);
         // try cwd.deleteFile("startChromeDriver.sh");
         defer {
             allocator.free(CWD_PATH);

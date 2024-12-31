@@ -267,7 +267,16 @@ pub fn executeCmds(argsLen: comptime_int, allocator: std.mem.Allocator, args: *c
     print("Utils::executeCmds*()::command output: {s}\n", .{stdout.items});
 }
 
+pub fn formatString(bufLen: comptime_int, comptime T: type, comptime format: T, args: anytype) ![]u8 {
+    var buf: [bufLen]u8 = undefined;
+    return try std.fmt.bufPrint(&buf, format, args);
+}
+
 pub fn binarySearch(comptime T: type, slice: T, element: anytype) i32 {
+    if (@TypeOf(element) != @Type(@typeInfo(T))) {
+        print("Utils::binarySearch():: element must be same as the T type in the list.", .{});
+        return -1;
+    }
     var left: usize = 0;
     var right: usize = slice.len - 1;
     while (left <= right) {
