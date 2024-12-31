@@ -4,6 +4,7 @@ const Logger = @import("./logger/logger.zig").Logger;
 const Utils = @import("./utils/utils.zig");
 const process = std.process;
 const Driver = @import("./driver//driver.zig").Driver;
+const DriverOptions = @import("./driver//types.zig").Options;
 
 // https://stackoverflow.com/questions/72122366/how-to-initialize-variadic-function-arguments-in-zig
 // https://www.reddit.com/r/Zig/comments/y5b2xw/anytype_vs_comptime_t/
@@ -22,15 +23,14 @@ const Driver = @import("./driver//driver.zig").Driver;
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    var args = process.args();
-    const driverOptions = try Utils.readCmdArgs(allocator, &args);
     var logger = try Logger.init("Logs");
     try logger.info("Main::main()::program running...", null);
-    var driver = try Driver.init(allocator, logger, driverOptions.value);
-    driverOptions.deinit();
+
+    var driver = try Driver.init(allocator, logger, DriverOptions{ .chromeDriverExecPath = "/Users/matheusduarte/Desktop/LearnZig/chromeDriver/chromedriver-mac-x64/chromedriver", .chromeDriverPort = 42069, .chromeDriverVersion = "Stable" });
     try driver.launchWindow("https://jsonplaceholder.typicode.com/");
     defer {
-        _ = gpa.deinit();
         logger.closeDirAndFiles();
+        const deinit_status = gpa.deinit();
+        if (deinit_status == .leak) @panic("Main::main()::leaking memory exiting program...");
     }
 }
